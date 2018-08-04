@@ -1,0 +1,13 @@
+http://karpathy.github.io/2016/05/31/rl/
+
+https://github.com/wenkesj/mario
+
+https://zombiesoup.com/reinforcement-learning-super-mario/
+
+https://github.com/ArvindSoma/a3c-super-mario-pytorch
+
+https://github.com/zidarsk8/marioAI/tree/master/src
+
+https://github.com/jafriyie1/Mario-Reinforcement-Learning
+
+https://keon.io/deep-q-learning/
