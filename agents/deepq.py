@@ -1,6 +1,6 @@
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 
 from agents.wrapper import ProcessFrame84
 
@@ -25,19 +25,19 @@ def main():
     parser.add_argument('--dueling', type=int, default=1)
     parser.add_argument('--num-timesteps', type=int, default=int(10e4))
     #parser.add_argument('--checkpoint-freq', type=int, default=10000)
-    parser.add_argument('--checkpoint-freq', type=int, default=10000)
-    parser.add_argument('--checkpoint-path', type=str, default=None)
+    parser.add_argument('--checkpoint-freq', type=int, default=1000)
+    parser.add_argument('--checkpoint-path', type=str, default='/.')
 
     args = parser.parse_args()
     logger.configure()
     set_global_seeds(args.seed)
 
     #env = make_atari(args.env)
-    env = gym_super_mario_bros.make('SuperMarioBros-v0')
+    env = gym_super_mario_bros.make('SuperMarioBros-v1')
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
 
-    env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
+    env = BinarySpaceToDiscreteSpaceEnv(env, COMPLEX_MOVEMENT)
     env = ProcessFrame84(env)
 
     print("logger.get_dir():", logger.get_dir())
@@ -48,7 +48,8 @@ def main():
     env = bench.Monitor(env, logger.get_dir())
     #env = deepq.wrap_atari_dqn(env)
     model = deepq.models.cnn_to_mlp(
-        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],
+        #convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)], # (num_outputs, kernel_size, stride)
+        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
         hiddens=[256],
         dueling=bool(args.dueling),
     )
