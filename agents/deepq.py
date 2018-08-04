@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--dueling', type=int, default=1)
     parser.add_argument('--num-timesteps', type=int, default=int(10e4))
     #parser.add_argument('--checkpoint-freq', type=int, default=10000)
-    parser.add_argument('--checkpoint-freq', type=int, default=10)
+    parser.add_argument('--checkpoint-freq', type=int, default=10000)
     parser.add_argument('--checkpoint-path', type=str, default=None)
 
     args = parser.parse_args()
@@ -33,13 +33,17 @@ def main():
     set_global_seeds(args.seed)
 
     #env = make_atari(args.env)
-    env = gym_super_mario_bros.make('SuperMarioBros-v3')
+    env = gym_super_mario_bros.make('SuperMarioBros-v0')
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
+
+
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = ProcessFrame84(env)
 
     print("logger.get_dir():", logger.get_dir())
     print("PROJ_DIR:", PROJ_DIR)
+
+    act = None
 
     env = bench.Monitor(env, logger.get_dir())
     #env = deepq.wrap_atari_dqn(env)
@@ -48,13 +52,28 @@ def main():
         hiddens=[256],
         dueling=bool(args.dueling),
     )
+
+    modelname = datetime.datetime.now().isoformat()
+
+    def render_callback(lcl, _glb):
+        # print(lcl['episode_rewards'])
+        total_steps = lcl['env'].total_steps
+        #if total_steps % 1000 == 0:
+        #    print("Saving model to mario_model.pkl")
+        #    act.save("../models/mario_model_{}.pkl".format(modelname))
+
+
+        env.render()
+        # pass
+
+
     act = deepq.learn(
         env,
         q_func=model,
         lr=1e-4,
         max_timesteps=args.num_timesteps,
         buffer_size=10000,
-        exploration_fraction=0.1,
+        exploration_fraction=0.5,#0.1,
         exploration_final_eps=0.01,
         train_freq=4,
         learning_starts=10000,
@@ -64,18 +83,16 @@ def main():
         prioritized_replay_alpha=args.prioritized_replay_alpha,
         checkpoint_freq=args.checkpoint_freq,
 #        checkpoint_path=args.checkpoint_path,
-        #callback=deepq_callback,
+        callback=render_callback,
         print_freq=1
     )
+
     print("Saving model to mario_model.pkl")
     act.save("../models/mario_model_{}.pkl".format(datetime.datetime.now().isoformat()))
 
     env.close()
 
-def render_callback(lcl, _glb):
-    #print(lcl['episode_rewards'])
-    #env.render()
-    pass
+
 
 def deepq_callback(locals, globals):
   #pprint.pprint(locals)
