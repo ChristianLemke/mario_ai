@@ -29,7 +29,8 @@ def main():
     parser.add_argument('--checkpoint-path', type=str, default='/.')
 
     args = parser.parse_args()
-    logger.configure()
+    # TODO change logging dir for tensorboard
+    logger.configure(dir=None, format_strs='stdout,log,csv,json,tensorboard')
     set_global_seeds(args.seed)
 
     #env = make_atari(args.env)
