@@ -2,7 +2,7 @@ from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 
-from agents.wrapper import ProcessFrame84
+from agents.wrapper import ProcessFrame84, FrameMemoryWrapper
 
 from baselines import deepq
 from baselines.common import set_global_seeds
@@ -23,14 +23,16 @@ def main():
     parser.add_argument('--prioritized', type=int, default=1)
     parser.add_argument('--prioritized-replay-alpha', type=float, default=0.6)
     parser.add_argument('--dueling', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(10e4))
+    parser.add_argument('--num-timesteps', type=int, default=int(100000))
     #parser.add_argument('--checkpoint-freq', type=int, default=10000)
     parser.add_argument('--checkpoint-freq', type=int, default=1000)
     parser.add_argument('--checkpoint-path', type=str, default='/.')
 
     args = parser.parse_args()
     # TODO change logging dir for tensorboard
-    logger.configure(dir=None, format_strs='stdout,log,csv,json,tensorboard')
+    #logger.configure(dir=None, format_strs='stdout,log,csv,json,tensorboard')
+    logger.configure(dir=None, format_strs=['stdout', 'log', 'csv', 'json', 'tensorboard'])
+    #logger.configure(dir=PROJ_DIR+"/../tensorboard/", format_strs=['stdout','log','csv','json','tensorboard'])
     set_global_seeds(args.seed)
 
     #env = make_atari(args.env)
@@ -38,8 +40,11 @@ def main():
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
 
-    env = BinarySpaceToDiscreteSpaceEnv(env, COMPLEX_MOVEMENT)
+    env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = ProcessFrame84(env)
+
+    env = FrameMemoryWrapper(env)
+
 
     print("logger.get_dir():", logger.get_dir())
     print("PROJ_DIR:", PROJ_DIR)
@@ -48,12 +53,30 @@ def main():
 
     env = bench.Monitor(env, logger.get_dir())
     #env = deepq.wrap_atari_dqn(env)
+
+    # model 01
+    '''
     model = deepq.models.cnn_to_mlp(
-        #convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)], # (num_outputs, kernel_size, stride)
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
         hiddens=[256],
         dueling=bool(args.dueling),
     )
+    '''
+
+    # model 02
+    # TODO 2 conv layer
+    # like the deep mind paper
+    # First layer input 84x84x4
+    # The first hidden layer convolves 16 8x8 filters, 4 stride
+    # The second hidden layer convolves 32 4x4 filters, 2 stride
+    # The flast layer 256 neurons
+    args.dueling = 0
+    model = deepq.models.cnn_to_mlp(
+        convs=[(16, 8, 4), (32, 4, 2)],  # (num_outputs, kernel_size, stride)
+        hiddens=[256],
+        dueling=bool(args.dueling),
+    )
+
 
     modelname = datetime.datetime.now().isoformat()
 
@@ -72,13 +95,13 @@ def main():
     act = deepq.learn(
         env,
         q_func=model,
-        lr=1e-4,
+        lr=0.00025,#1e-4
         max_timesteps=args.num_timesteps,
-        buffer_size=10000,
-        exploration_fraction=0.5,#0.1,
-        exploration_final_eps=0.01,
-        train_freq=4,
-        learning_starts=10000,
+        buffer_size=25000,#5000, #10000
+        exploration_fraction=0.9,#0.1,
+        exploration_final_eps=0.1,# 0.01
+        train_freq=4,#4
+        learning_starts=25000,#10000
         target_network_update_freq=1000,
         gamma=0.99,
         prioritized_replay=bool(args.prioritized),

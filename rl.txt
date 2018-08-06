@@ -11,3 +11,7 @@ https://github.com/zidarsk8/marioAI/tree/master/src
 https://github.com/jafriyie1/Mario-Reinforcement-Learning
 
 https://keon.io/deep-q-learning/
+
+https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/deep_q_learning.html
+
+https://arxiv.org/abs/1312.5602

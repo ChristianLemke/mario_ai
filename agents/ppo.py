@@ -1,7 +1,7 @@
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
-from agents.wrapper import ProcessFrame84
+from agents.wrapper import ProcessFrame84, FrameMemoryWrapper
 
 from mpi4py import MPI
 from baselines.common import set_global_seeds
@@ -25,11 +25,14 @@ def train(env_id, num_timesteps, seed):
     set_global_seeds(workerseed)
     #env = make_atari(env_id)
 
-    env = gym_super_mario_bros.make('SuperMarioBros-v3')
+    env = gym_super_mario_bros.make('SuperMarioBros-v1')
     # env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = ProcessFrame84(env)
+
+    env = FrameMemoryWrapper(env)
+
 
 
 
@@ -57,11 +60,11 @@ def train(env_id, num_timesteps, seed):
 
     pposgd_simple.learn(env, policy_fn,
         max_timesteps=int(num_timesteps * 1.1),
-        timesteps_per_actorbatch=256,
+        timesteps_per_actorbatch=2048,
         clip_param=0.2, entcoeff=0.01,
-        optim_epochs=4, optim_stepsize=1e-3,
-                        #optim_batchsize=64,
-                        optim_batchsize=256,
+        optim_epochs=4,
+        optim_stepsize=1e-3, # 3e-4
+        optim_batchsize=64, #256
         gamma=0.99, lam=0.95,
         schedule='linear',
         callback = render_callback
