@@ -3,6 +3,7 @@ import gym
 import numpy as np
 from gym import spaces
 
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 # https://github.com/chris-chris/mario-rl-tutorial/
 
 class ProcessFrame84(gym.ObservationWrapper):
@@ -43,6 +44,8 @@ class FrameMemoryWrapper(gym.ObservationWrapper):
         print('clear')
         self.frame_queue.clear()
 
+
+
     @staticmethod
     def process(img, frame_queue):
         # first step
@@ -61,3 +64,42 @@ class FrameMemoryWrapper(gym.ObservationWrapper):
 
 
         return obs.astype(np.uint8)
+
+
+class VideoRecorderWrapper(gym.ObservationWrapper):
+    """
+    """
+
+    def __init__(self, env=None, path=None, training_start= None, freq_episode=100):
+        super(VideoRecorderWrapper, self).__init__(env)
+        self.episode = 0
+        self.env = env
+        self.path= path
+        self.training_start = training_start
+        self.freq_episode = freq_episode
+        self.rec = None
+        self.rec_now = False
+
+    def _observation(self, obs):
+        if self.rec_now:
+            self.rec.capture_frame()
+        return obs
+
+    def reset(self, **kwargs):
+        observation = self.env.reset(**kwargs)
+        self.episode += 1
+
+        if self.rec_now:
+            print("Stop record episode {}".format(self.episode-1))
+            self.rec.close()
+            self.rec_now = False
+
+        if self.episode % self.freq_episode == 0:
+            print("Start record episode {}".format(self.episode))
+            path = "{}/{}_{:0>5d}.mp4".format(self.path, self.training_start, self.episode)
+            self.rec = VideoRecorder(self.env, path=path)
+            self.rec_now = True
+
+
+
+        return observation

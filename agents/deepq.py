@@ -1,16 +1,19 @@
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
-from agents.wrapper import ProcessFrame84, FrameMemoryWrapper
+from agents.wrapper import ProcessFrame84, FrameMemoryWrapper, VideoRecorderWrapper
 
 from baselines import deepq
 from baselines.common import set_global_seeds
+from baselines.common.atari_wrappers import *
 from baselines import bench
 import argparse
 from baselines import logger
 
 import datetime
+import time
 import os
 import sys
 
@@ -20,30 +23,36 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     #parser.add_argument('--env', help='environment ID', default='BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--prioritized', type=int, default=1)
-    parser.add_argument('--prioritized-replay-alpha', type=float, default=0.6)
-    parser.add_argument('--dueling', type=int, default=1)
-    parser.add_argument('--num-timesteps', type=int, default=int(100000))
+    parser.add_argument('--dueling', type=int, default=0)
     #parser.add_argument('--checkpoint-freq', type=int, default=10000)
-    parser.add_argument('--checkpoint-freq', type=int, default=1000)
+    parser.add_argument('--checkpoint-freq', type=int, default=10000)
     parser.add_argument('--checkpoint-path', type=str, default='/.')
 
     args = parser.parse_args()
     # TODO change logging dir for tensorboard
     #logger.configure(dir=None, format_strs='stdout,log,csv,json,tensorboard')
-    logger.configure(dir=None, format_strs=['stdout', 'log', 'csv', 'json', 'tensorboard'])
-    #logger.configure(dir=PROJ_DIR+"/../tensorboard/", format_strs=['stdout','log','csv','json','tensorboard'])
+    #logger.configure(dir=None, format_strs=['stdout', 'log', 'csv', 'json', 'tensorboard'])
+    timestart = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H:%M:%S')
+    logger.configure(dir=PROJ_DIR+"/../tensorboard/"+str(timestart), format_strs=['stdout','log','csv','json','tensorboard'])
+    logger.set_level(logger.INFO)
     set_global_seeds(args.seed)
 
-    #env = make_atari(args.env)
+    #env = gym_super_mario_bros.make('SuperMarioBros-v1')
     env = gym_super_mario_bros.make('SuperMarioBros-v1')
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
-
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-    env = ProcessFrame84(env)
 
-    env = FrameMemoryWrapper(env)
+    env = VideoRecorderWrapper(env, PROJ_DIR+"/../video", str(timestart), 50)
+
+
+    env = WarpFrame(env)
+
+    env = FrameStack(env, 4)
+
+    # custom
+    #env = ProcessFrame84(env)
+    #env = FrameMemoryWrapper(env)
 
 
     print("logger.get_dir():", logger.get_dir())
@@ -54,6 +63,19 @@ def main():
     env = bench.Monitor(env, logger.get_dir())
     #env = deepq.wrap_atari_dqn(env)
 
+    modelname = datetime.datetime.now().isoformat()
+
+    def render_callback(lcl, _glb):
+        # print(lcl['episode_rewards'])
+        total_steps = lcl['env'].total_steps
+
+        #if total_steps % 2000 == 0:
+
+        #env.render()
+        # pass
+
+
+
     # model 01
     '''
     model = deepq.models.cnn_to_mlp(
@@ -63,94 +85,102 @@ def main():
     )
     '''
 
+
+
     # model 02
-    # TODO 2 conv layer
     # like the deep mind paper
     # First layer input 84x84x4
     # The first hidden layer convolves 16 8x8 filters, 4 stride
     # The second hidden layer convolves 32 4x4 filters, 2 stride
     # The flast layer 256 neurons
-    args.dueling = 0
+    '''
     model = deepq.models.cnn_to_mlp(
         convs=[(16, 8, 4), (32, 4, 2)],  # (num_outputs, kernel_size, stride)
         hiddens=[256],
-        dueling=bool(args.dueling),
+        dueling=bool(0),
     )
+    '''
 
 
-    modelname = datetime.datetime.now().isoformat()
-
-    def render_callback(lcl, _glb):
-        # print(lcl['episode_rewards'])
-        total_steps = lcl['env'].total_steps
-        #if total_steps % 1000 == 0:
-        #    print("Saving model to mario_model.pkl")
-        #    act.save("../models/mario_model_{}.pkl".format(modelname))
-
-
-        env.render()
-        # pass
-
+    # model 03
+    # nature human paper
+    # The first hidden layer convolves 32 filters of 8 x 8 with stride 4 with the input image and applies a rectifier nonlinearity.
+    # The second hidden layer convolves 64 filters of 4 x 4 with stride 2, again followed by a rectifier nonlinearity.
+    # This is followed by a third convolutional layer that convolves 64 filters of 3 x 3 with stride 1 followed by a rectifier.
+    # The final hidden layer is fully-connected and consists of 512 rectifier units.
+    '''
+    model = deepq.models.cnn_to_mlp(
+        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
+        hiddens=[512],
+        dueling=bool(0),
+    )
 
     act = deepq.learn(
         env,
         q_func=model,
-        lr=0.00025,#1e-4
-        max_timesteps=args.num_timesteps,
-        buffer_size=25000,#5000, #10000
-        exploration_fraction=0.9,#0.1,
-        exploration_final_eps=0.1,# 0.01
-        train_freq=4,#4
-        learning_starts=25000,#10000
+        lr=0.00025,  # 1e-4
+        max_timesteps=int(100000),
+        buffer_size=50000,  # 5000, #10000
+        exploration_fraction=0.9,  # 0.1,
+        exploration_final_eps=0.1,  # 0.01
+        train_freq=4,  # 4
+        learning_starts=25000,  # 10000
         target_network_update_freq=1000,
         gamma=0.99,
-        prioritized_replay=bool(args.prioritized),
-        prioritized_replay_alpha=args.prioritized_replay_alpha,
+        prioritized_replay=bool(0),
+        prioritized_replay_alpha=0.6,
         checkpoint_freq=args.checkpoint_freq,
-#        checkpoint_path=args.checkpoint_path,
+        #        checkpoint_path=args.checkpoint_path,
         callback=render_callback,
         print_freq=1
     )
+    '''
+
+    #2:20 model 03 max_timesteps=int(1000000), buffer_size=50000,
+    #2:21 model 03 max_timesteps=int(500000), buffer_size=25000,
+    # 2018-08-07-11:49:49 model 04
+    # 2018-08-07-14:56:07_00800 model 4, 300k timesteps
+    # 2018-08-07-22:10:37 v3, model 4, 200k timesteps
+    # 2018-08-07-22:10:42 v1, model 4, 200k timesteps
+
+
+
+
+    # model 04
+    # nature human paper + Improvements
+    # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
+    model = deepq.models.cnn_to_mlp(
+        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
+        hiddens=[512],
+        dueling=bool(1),
+    )
+
+    act = deepq.learn(
+        env,
+        q_func=model,
+        lr=0.00025,  # 1e-4
+        max_timesteps=int(200000), # 100k -> 3h
+        buffer_size=50000,  # 5000, #10000
+        exploration_fraction=0.9,  # 0.1,
+        exploration_final_eps=0.1,  # 0.01
+        train_freq=4,  # 4
+        learning_starts=25000,  # 10000
+        target_network_update_freq=1000,
+        gamma=0.95, #0.99,
+        prioritized_replay=bool(1),
+        prioritized_replay_alpha=0.6,
+        checkpoint_freq=args.checkpoint_freq,
+        #        checkpoint_path=args.checkpoint_path,
+        callback=render_callback,
+        print_freq=1
+    )
+
+
 
     print("Saving model to mario_model.pkl")
     act.save("../models/mario_model_{}.pkl".format(datetime.datetime.now().isoformat()))
 
     env.close()
-
-
-
-def deepq_callback(locals, globals):
-  #pprint.pprint(locals)
-  global max_mean_reward, last_filename
-  if('done' in locals and locals['done'] == True):
-    if('mean_100ep_reward' in locals
-      and locals['num_episodes'] >= 10
-      and locals['mean_100ep_reward'] > max_mean_reward
-      ):
-      print("mean_100ep_reward : %s max_mean_reward : %s" %
-            (locals['mean_100ep_reward'], max_mean_reward))
-
-      if(not os.path.exists(os.path.join(PROJ_DIR,'models/deepq/'))):
-        try:
-          os.mkdir(os.path.join(PROJ_DIR,'models/'))
-        except Exception as e:
-          print(str(e))
-        try:
-          os.mkdir(os.path.join(PROJ_DIR,'models/deepq/'))
-        except Exception as e:
-          print(str(e))
-
-      if(last_filename != ""):
-        os.remove(last_filename)
-        print("delete last model file : %s" % last_filename)
-
-      max_mean_reward = locals['mean_100ep_reward']
-      act = deepq.ActWrapper(locals['act'], locals['act_params'])
-
-      filename = os.path.join(PROJ_DIR,'models/deepq/mario_reward_%s.pkl' % locals['mean_100ep_reward'])
-      act.save(filename)
-      print("save best mean_100ep_reward model to %s" % filename)
-      last_filename = filename
 
 
 if __name__ == '__main__':
