@@ -1,13 +1,15 @@
-from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
+from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, DownsampleEnv, FrameStackEnv, PenalizeDeathEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
-from agents.wrapper import ProcessFrame84, FrameMemoryWrapper, VideoRecorderWrapper
+from agents.wrapper import ProcessFrame84, FrameMemoryWrapper, VideoRecorderWrapper, EpisodicLifeEnv
+
+
 
 from baselines import deepq
 from baselines.common import set_global_seeds
-from baselines.common.atari_wrappers import *
+from baselines.common.atari_wrappers import WarpFrame, FrameStack
 from baselines import bench
 import argparse
 from baselines import logger
@@ -38,17 +40,23 @@ def main():
     set_global_seeds(args.seed)
 
     #env = gym_super_mario_bros.make('SuperMarioBros-v1')
-    env = gym_super_mario_bros.make('SuperMarioBros-v1')
+    env = gym_super_mario_bros.make('SuperMarioBros-v3')
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
 
     env = VideoRecorderWrapper(env, PROJ_DIR+"/../video", str(timestart), 50)
 
+    env = EpisodicLifeEnv(env)
 
-    env = WarpFrame(env)
+    # nes_py
+    env = DownsampleEnv(env, (84, 84))
+    env = PenalizeDeathEnv(env, penalty=-25)
+    env = FrameStackEnv(env, 4)
 
-    env = FrameStack(env, 4)
+    # gym
+    #env = WarpFrame(env)
+    #env = FrameStack(env, 4)
 
     # custom
     #env = ProcessFrame84(env)
@@ -61,6 +69,8 @@ def main():
     act = None
 
     env = bench.Monitor(env, logger.get_dir())
+
+
     #env = deepq.wrap_atari_dqn(env)
 
     modelname = datetime.datetime.now().isoformat()
@@ -71,7 +81,7 @@ def main():
 
         #if total_steps % 2000 == 0:
 
-        #env.render()
+        env.render()
         # pass
 
 
@@ -149,6 +159,7 @@ def main():
     # model 04
     # nature human paper + Improvements
     # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
+    '''
     model = deepq.models.cnn_to_mlp(
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
         hiddens=[512],
@@ -158,8 +169,8 @@ def main():
     act = deepq.learn(
         env,
         q_func=model,
-        lr=0.00025,  # 1e-4
-        max_timesteps=int(200000), # 100k -> 3h
+        lr=0.2,  # 0.00025 1e-4
+        max_timesteps=int(50000), # 100k -> 3h
         buffer_size=50000,  # 5000, #10000
         exploration_fraction=0.9,  # 0.1,
         exploration_final_eps=0.1,  # 0.01
@@ -174,11 +185,48 @@ def main():
         callback=render_callback,
         print_freq=1
     )
+    '''
+
+    # 2018-08-08-18:38:35, model4 100k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
+    # 2018-08-08-19:29:19, model4 200k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
+    # 2018-08-08-19:29:54, model4 300k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
+    # 2018-08-08-20:25:59, model 4 100k, lr = 0.001
+    # 2018-08-08-20:35:42  model 4 100k, lr = 0.05
+    # 2018-08-08-20:35:42  model 4 100k, lr = 0.01 mode 3
+    # 2018-08-08-22:37:00 model 4 50k, lr = 0.2 mode 1
+
+    # model 05
+    # nature human paper + Improvements
+    # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
+    model = deepq.models.cnn_to_mlp(
+        convs=[(32, 8, 4)],  # (num_outputs, kernel_size, stride)
+        hiddens=[128, 64],
+        dueling=bool(1),
+    )
+
+    act = deepq.learn(
+        env,
+        q_func=model,
+        lr=0.2,  # 0.00025 1e-4
+        max_timesteps=int(50000),  # 100k -> 3h
+        buffer_size=50000,  # 5000, #10000
+        exploration_fraction=0.9,  # 0.1,
+        exploration_final_eps=0.1,  # 0.01
+        train_freq=4,  # 4
+        learning_starts=25000,  # 10000
+        target_network_update_freq=1000,
+        gamma=0.95,  # 0.99,
+        prioritized_replay=bool(1),
+        prioritized_replay_alpha=0.6,
+        checkpoint_freq=args.checkpoint_freq,
+        #        checkpoint_path=args.checkpoint_path,
+        callback=render_callback,
+        print_freq=1
+    )
 
 
-
-    print("Saving model to mario_model.pkl")
-    act.save("../models/mario_model_{}.pkl".format(datetime.datetime.now().isoformat()))
+    print("Saving model to mario_model.pkl " + timestart)
+    act.save("../models/mario_model_{}.pkl".format(timestart))
 
     env.close()
 

@@ -52,7 +52,7 @@ def main():
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = ProcessFrame84(env)
     env = FrameMemoryWrapper(env)
-    act = deepq.load(PROJ_DIR+"/../models/mario_model_2018-08-06T22:14:14.220350_lernrate2.pkl")
+    act = deepq.load(PROJ_DIR+"/../models/mario_model_2018-08-08T23:42:54.257964.pkl")
 
 
 
