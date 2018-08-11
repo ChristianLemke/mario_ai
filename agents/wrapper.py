@@ -2,26 +2,33 @@ import cv2
 import gym
 import numpy as np
 from gym import spaces
+from PIL import Image
 
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
 # https://github.com/chris-chris/mario-rl-tutorial/
 
-class ProcessFrame84(gym.ObservationWrapper):
-    def __init__(self, env=None):
-        super(ProcessFrame84, self).__init__(env)
-        self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1))
+class MyDownSampleWrapper(gym.ObservationWrapper):
+    def __init__(self, env, image_size):
+        super(MyDownSampleWrapper, self).__init__(env)
+        self._image_size = image_size
+        # set up a new observation space
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=255,
+            shape=(self._image_size[1], self._image_size[0], 1),
+            dtype=np.uint8
+        )
 
-    def _observation(self, obs):
-        return ProcessFrame84.process(obs)
+    def observation(self, frame):
+        # convert the frame from RGB to gray scale
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        # resize the frame to the expected shape.
+        #cv2.INTER_AREA
+        #INTER_NEAREST
+        frame = cv2.resize(frame, self._image_size)
+        #frame = cv2.resize(frame, self._image_size)
 
-    @staticmethod
-    def process(img):
-        img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
-        x_t = cv2.resize(img, (84, 84), interpolation=cv2.INTER_AREA)
-        x_t = np.reshape(x_t, (84, 84, 1))
-        x_t = np.nan_to_num(x_t)
-        return x_t.astype(np.uint8)
-
+        return frame[:, :, np.newaxis]
 
 
 class FrameMemoryWrapper(gym.ObservationWrapper):
@@ -143,3 +150,70 @@ class EpisodicLifeEnv(gym.Wrapper):
             #print("nicht was_real_done", self.env.unwrapped._get_life())
         self.lives = self.env.unwrapped._get_life()
         return obs
+
+class MyRewardWrapper(gym.Wrapper):
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        self._x_position = 0
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+
+        _x_position = self.env.unwrapped._get_x_position()
+        _reward = _x_position - self._x_position
+        self._x_position = _x_position
+        # resolve an issue where after death the x position resets. The x delta
+        # is typically has at most magnitude of 3, 5 is a safe bound
+        if _reward < -5 or _reward > 5:
+            _reward = 0
+
+
+        reward = _reward
+
+        #print('reward', reward)
+
+        return obs, reward, done, info
+
+class CroppingWrapper(gym.ObservationWrapper):
+    """
+    """
+
+    def __init__(self, env=None):
+        super(CroppingWrapper, self).__init__(env)
+        self.env = env
+
+        self.new_size = (20,20)
+
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.new_size[1], self.new_size[0], 1),
+            dtype=np.uint8
+        )
+
+    def _observation(self, obs):
+        #x_t = cv2.resize(obs, (84, 84), interpolation=cv2.INTER_AREA)
+        #x_t = np.reshape(x_t, (84, 84, 1))
+        #x_t = np.nan_to_num(x_t)
+        #return x_t.astype(np.uint8)
+        #obs.resize((32,32))
+        #size = (16,16)
+        #obs.resize(size)
+
+        obs = obs[10:30, 10:30, :] # 32x32 -> 20x20
+
+        obs = np.array(obs)
+        #obs = obs.shape((20,20,1))
+
+
+        #obs2 = np.copy(obs)
+        #obs2.resize(self.new_size)
+
+
+        #img = Image.fromarray(obs)
+        #cv2.imshow('image', obs2)
+        #cv2.waitKey(1)
+        #img.save('testaww_{}.png'.format(self.new_size))
+
+        return obs
+
