@@ -1,9 +1,12 @@
 import gym
 import os
 from baselines import deepq
-from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
+from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, DownsampleEnv, FrameStackEnv, PenalizeDeathEnv
+
+from agents.wrapper import ProcessFrame84, FrameMemoryWrapper, VideoRecorderWrapper, EpisodicLifeEnv
 import numpy as np
 
 from PIL import Image
@@ -19,12 +22,14 @@ import argparse
 from baselines import logger
 
 import datetime
+import time
 import os
 
 PROJ_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def plot_obs(obs):
+    pass
 
     #img = Image.fromarray(obs, 'L')
     #img.show()
@@ -37,10 +42,10 @@ def plot_obs(obs):
     #plt.show()
 
     #arr = np.random.randint(0, 256, 100*100)
-    arr = obs.flatten()
-    arr.resize((84, 84))
-    arr.astype(np.uint8)
-    im = Image.fromarray(arr, mode="L")
+    #arr = obs.flatten()
+    #arr.resize((84, 84))
+    #arr.astype(np.uint8)
+    # im = Image.fromarray(arr, mode="L")
     #im.save("aa.png")
     #im.show()
 
@@ -50,26 +55,53 @@ def main():
     #env = gym_super_mario_bros.make('SuperMarioBros-v0')
     env = gym_super_mario_bros.make('SuperMarioBros-1-1-v1')
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-    env = ProcessFrame84(env)
-    env = FrameMemoryWrapper(env)
-    act = deepq.load(PROJ_DIR+"/../models/mario_model_2018-08-08T23:42:54.257964.pkl")
+    timestart = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H:%M:%S')
+    # env = VideoRecorderWrapper(env, PROJ_DIR + "/../video", str(timestart), 50)
+
+    env = VideoRecorderWrapper(env, PROJ_DIR + "/../video/final", str(timestart), 1)
+
+    #env = EpisodicLifeEnv(env)
 
 
 
+    env = DownsampleEnv(env, (84, 84))
+    env = PenalizeDeathEnv(env, penalty=-25)
+    env = FrameStackEnv(env, 4)
+
+
+    # good
+    #act = deepq.load(PROJ_DIR+"/../models/mario_model_2018-08-12-13:00:58.pkl")
+
+    # better
+    act = deepq.load(PROJ_DIR + "/../models/mario_model_2018-08-12-19:21:50.pkl")
+
+
+
+    #env2 = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
+    #env2 = BinarySpaceToDiscreteSpaceEnv(env2, SIMPLE_MOVEMENT)
+    #env2 = EpisodicLifeEnv(env2)
+    #env2 = DownsampleEnv(env2, (84, 84))
+    #env2 = PenalizeDeathEnv(env2, penalty=-25)
+    #env2 = FrameStackEnv(env2, 4)
+    episode = 0
     while True:
         obs, done = env.reset(), False
+        #env2.reset()
         stepnr = 0
         episode_rew = 0
         while not done:
             env.render()
+            #env2.render()
             obs, rew, done, _ = env.step(act(obs[None])[0])
+            #env2.step(act(obs[None])[0])
 
             if stepnr % 20 == 0:
                 plot_obs(obs)
 
             episode_rew += rew
             stepnr += 1
-        print("Episode reward", episode_rew)
+        print("Episode reward", episode_rew, episode)
+        episode = episode+1
 
 
 if __name__ == '__main__':
