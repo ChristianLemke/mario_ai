@@ -3,13 +3,13 @@ import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
-from agents.wrapper import MyDownSampleWrapper, FrameMemoryWrapper, VideoRecorderWrapper, EpisodicLifeEnv, MyRewardWrapper, CroppingWrapper
+from agents.wrapper import FrameMemoryWrapper, VideoRecorderWrapper, EpisodicLifeEnv
 
 
 
 from baselines import deepq
 from baselines.common import set_global_seeds
-from baselines.common.atari_wrappers import WarpFrame, FrameStack, ScaledFloatFrame
+from baselines.common.atari_wrappers import WarpFrame, FrameStack
 from baselines import bench
 import argparse
 from baselines import logger
@@ -30,15 +30,6 @@ def main():
     parser.add_argument('--checkpoint-freq', type=int, default=10000)
     parser.add_argument('--checkpoint-path', type=str, default='/.')
 
-    # actions for very simple movement
-    SIMPLE_MOVEMENT_NO_B = [
-        ['NOP'],
-        ['right'],
-        ['right', 'A'],
-        ['A'],
-        ['left'],
-    ]
-
     args = parser.parse_args()
     # TODO change logging dir for tensorboard
     #logger.configure(dir=None, format_strs='stdout,log,csv,json,tensorboard')
@@ -49,54 +40,26 @@ def main():
     set_global_seeds(args.seed)
 
     #env = gym_super_mario_bros.make('SuperMarioBros-v1')
-    #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-1-1-v3')
+    env = gym_super_mario_bros.make('SuperMarioBros-v1')
     #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
 
-    #env = gym_super_mario_bros.make('SuperMarioBros-1-1-v3')
+    env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
 
-    env = gym_super_mario_bros.make('SuperMarioBros-8-4-v3')
-
-    # only reward x change
-    #env = MyRewardWrapper(env)
-
-    # -25 for death
-    env = PenalizeDeathEnv(env, penalty=-25)
-
-    #env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-    env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT_NO_B)
-
-    # record videos
     env = VideoRecorderWrapper(env, PROJ_DIR+"/../video", str(timestart), 50)
 
-    # each live one episode
     env = EpisodicLifeEnv(env)
 
-
-    #env = DownsampleEnv(env, (84, 84))
-    #env = DownsampleEnv(env, (64, 64))
-    env = DownsampleEnv(env, (32, 32))
-
-    # cropping
-    env = CroppingWrapper(env)
-
-    # scale
-    env = ScaledFloatFrame(env)
-
-    # frame stack
+    # nes_py
+    env = DownsampleEnv(env, (84, 84))
+    env = PenalizeDeathEnv(env, penalty=-25)
     env = FrameStackEnv(env, 4)
 
-
-    # possible wrappers:
-    # nes_py
-    # env = DownsampleEnv(env, (84, 84))
-
-
     # gym
-    #env = WarpFrame(env) # interpolation INTER_AREA
+    #env = WarpFrame(env)
     #env = FrameStack(env, 4)
 
     # custom
-    # env = MyDownSampleWrapper(env, (32, 32))
+    #env = ProcessFrame84(env)
     #env = FrameMemoryWrapper(env)
 
 
@@ -118,7 +81,7 @@ def main():
 
         #if total_steps % 2000 == 0:
 
-        #env.render()
+        env.render()
         # pass
 
 
@@ -189,41 +152,60 @@ def main():
     # 2018-08-07-14:56:07_00800 model 4, 300k timesteps
     # 2018-08-07-22:10:37 v3, model 4, 200k timesteps
     # 2018-08-07-22:10:42 v1, model 4, 200k timesteps
+#2018-08-12-08:38:40 model 4, 50k timesteps, lr 0.5, ef 0.9, gamma 0.95 v1
 
 
 
+#2018-08-12-09:19:56 model 4, 100k, lr 0.0025, alpha 0.8, gamma 0.9, 8 frames v1
+#2018-08-12-12:56:52 model 4, 100k, lr 0.0025, alpha 0.8, gamma 0.9, 4 frames v1
+#2018-08-12-12:58:06 model 4, 100k, lr 0.0001, alpha 0.8, gamma 0.9, 4 frames v1
+#2018-08-12-12:59:49 model 4, 100k, lr 0.0001, alpha 0.5, gamma 0.9, 4 frames v1
+#2018-08-12-13:00:58 model 4, 100k, lr 0.0001, alpha 0.2, gamma 0.9, 4 frames v1
+
+
+    # last day
+    # best
+    # 2018-08-12-16:45:48 model 4, 100k, lr 0.0001, alpha 0.2, gamma 0.9, 4 frames v1 hidden 256
+
+    # 2018-08-12-17:48:48 gamma=0.2 fraction=0.3, lr= 0.0001, hidden 256
+
+    # 2018-08-12-18:12:12 gamma=0.5, fraction=0.3, lr= 0.0001, hidden 256
+
+    # 2018-08-12-19:21:50 512
+
+
+    #2018-08-12-10:25:50 model 4, 100k, lr 0.0005, alpha 0.6, gamma 0.99, 8 frames v1
+    #2018-08-12-11:31:59 model 4, 100k, lr 0.0005, alpha 0.8, gamma 0.99, 6 frames v1
 
     # model 04
     # nature human paper + Improvements
     # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
-    '''
+
     model = deepq.models.cnn_to_mlp(
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
-        hiddens=[512],
-        #hiddens=[64,64],
+        hiddens=[512],# 512
         dueling=bool(1),
     )
 
     act = deepq.learn(
         env,
         q_func=model,
-        lr=0.2,  # 0.00025 1e-4
-        max_timesteps=int(50000), # 100k -> 3h
+        lr= 0.0001,  # 0.00025 1e-4
+        max_timesteps=int(100000), # 100k -> 3h
         buffer_size=50000,  # 5000, #10000
-        exploration_fraction=0.9,  # 0.1,
+        exploration_fraction=0.3,  # 0.1,
         exploration_final_eps=0.1,  # 0.01
         train_freq=4,  # 4
         learning_starts=25000,  # 10000
         target_network_update_freq=1000,
-        gamma=0.95, #0.99,
+        gamma=0.5, #0.99,
         prioritized_replay=bool(1),
-        prioritized_replay_alpha=0.6,
+        prioritized_replay_alpha=0.2,
         checkpoint_freq=args.checkpoint_freq,
         #        checkpoint_path=args.checkpoint_path,
         callback=render_callback,
         print_freq=1
     )
-    '''
 
 
     # 2018-08-08-18:38:35, model4 100k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
@@ -234,29 +216,29 @@ def main():
     # 2018-08-08-20:35:42  model 4 100k, lr = 0.01 mode 3
     # 2018-08-08-22:37:00 model 4 50k, lr = 0.2 mode 1
 
+
     # model 05
     # nature human paper + Improvements
-    # https://github.com/aleju/mario-ai
     # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
     '''
     model = deepq.models.cnn_to_mlp(
-        convs=[(32, 3, 1),(64, 5, 2),(64, 5, 4)],  # (num_outputs, kernel_size, stride)
-        hiddens=[256],
+        convs=[(32, 8, 4)],  # (num_outputs, kernel_size, stride)
+        hiddens=[128, 64],
         dueling=bool(1),
     )
 
     act = deepq.learn(
         env,
         q_func=model,
-        lr=0.2,  # 0.00025 1e-4
-        max_timesteps=int(300000),  # 100k -> 3h
+        lr=0.5,  # 0.00025 1e-4
+        max_timesteps=int(50000),  # 100k -> 3h
         buffer_size=50000,  # 5000, #10000
         exploration_fraction=0.9,  # 0.1,
         exploration_final_eps=0.1,  # 0.01
         train_freq=4,  # 4
         learning_starts=25000,  # 10000
         target_network_update_freq=1000,
-        gamma=0.9,  # 0.99,
+        gamma=0.99,  # 0.99,
         prioritized_replay=bool(1),
         prioritized_replay_alpha=0.6,
         checkpoint_freq=args.checkpoint_freq,
@@ -264,45 +246,7 @@ def main():
         callback=render_callback,
         print_freq=1
     )
-    '''
-
-    # model 06
-    # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
-    ''''''
-    model = deepq.models.cnn_to_mlp(
-        #convs=[(200, 4, 2)],  # (num_outputs, kernel_size, stride)
-        #convs=[(50, 4, 2), (32, 4, 2)],
-        convs=[(200, 2, 2)],
-        #hiddens=[256],
-        hiddens=[128],
-        # hiddens=[64,64],
-        dueling=bool(1),
-    )
-
-    act = deepq.learn(
-        env,
-        q_func=model,
-        lr=0.02,  # 0.00025 1e-4
-        max_timesteps=int(200000),  # 100k -> 3h
-        buffer_size=50000,  # 5000, #10000
-        exploration_fraction=0.75,  # 0.1,
-        exploration_final_eps=0.1, #0.02,  # 0.01
-        train_freq=4,  # 4
-        learning_starts=25000,  # 10000
-        target_network_update_freq=1000,
-        gamma=0.90,  # 0.99,
-        prioritized_replay=bool(1),
-        prioritized_replay_alpha=0.6,
-        checkpoint_freq=args.checkpoint_freq,
-        #        checkpoint_path=args.checkpoint_path,
-        callback=render_callback,
-        print_freq=1
-    )
-
-    # 2018-08-11-15:54:16 convs=[(200, 4, 4)],  # (num_outputs, kernel_size, stride) hiddens=[265] ?lr=0.2?
-    # 2018-08-11-16:01:30 convs=[(200, 4, 2)] hiddens=[256] lr = 0.02
-    # 2018-08-11-18:42:39 exploration_fraction=0.1, exploration_final_eps=0.02
-
+'''
 
     print("Saving model to mario_model.pkl " + timestart)
     act.save("../models/mario_model_{}.pkl".format(timestart))
