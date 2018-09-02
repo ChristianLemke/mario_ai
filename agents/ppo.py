@@ -23,11 +23,7 @@ def train(env_id, num_timesteps, seed):
         logger.configure(format_strs=[])
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
-    #env = make_atari(env_id)
-
     env = gym_super_mario_bros.make('SuperMarioBros-v1')
-    # env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
-
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = ProcessFrame84(env)
 
@@ -45,7 +41,6 @@ def train(env_id, num_timesteps, seed):
     #env = wrap_deepmind(env)
     env.seed(workerseed)
 
-
     def render_callback(lcl, _glb):
         # print(lcl['episode_rewards'])
         total_steps = lcl['env'].total_steps
@@ -53,10 +48,8 @@ def train(env_id, num_timesteps, seed):
         #    print("Saving model to mario_model.pkl")
         #    act.save("../models/mario_model_{}.pkl".format(modelname))
 
-
         env.render()
         # pass
-
 
     pposgd_simple.learn(env, policy_fn,
         max_timesteps=int(num_timesteps * 1.1),
