@@ -71,6 +71,8 @@ def main():
         # pass
 
 #different models with different parameters. out commented
+#CNN built deepq.models.with cnn_to_mlp(params)
+#trained with deepq.learn(params)
 
     # model 01
     '''
