@@ -74,6 +74,51 @@ def main():
 #CNN built deepq.models.with cnn_to_mlp(params)
 #trained with deepq.learn(params)
 
+#2018-08-12-10:25:50 model 4, 100k, lr 0.0005, alpha 0.6, gamma 0.99, 8 frames v1
+#2018-08-12-11:31:59 model 4, 100k, lr 0.0005, alpha 0.8, gamma 0.99, 6 frames v1
+
+# model 04
+# nature human paper + Improvements
+# Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
+    model = deepq.models.cnn_to_mlp(
+        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
+        hiddens=[512],# 512
+        dueling=bool(1),
+    )
+
+    act = deepq.learn(
+        env,
+        q_func=model,
+        lr= 0.0001,  # 0.00025 1e-4
+        max_timesteps=int(100000), # 100k -> 3h
+        buffer_size=50000,  # 5000, #10000
+        exploration_fraction=0.3,  # 0.1,
+        exploration_final_eps=0.1,  # 0.01
+        train_freq=4,  # 4
+        learning_starts=25000,  # 10000
+        target_network_update_freq=1000,
+        gamma=0.5, #0.99,
+        prioritized_replay=bool(1),
+        prioritized_replay_alpha=0.2,
+        checkpoint_freq=args.checkpoint_freq,
+        #        checkpoint_path=args.checkpoint_path,
+        callback=render_callback,
+        print_freq=1
+    )
+
+
+    print("Saving model to mario_model.pkl " + timestart)
+    act.save("../models/mario_model_{}.pkl".format(timestart))
+
+    env.close()
+
+
+if __name__ == '__main__':
+    main()
+
+
+#Trials of different models are listed below......#
+
     # model 01
     '''
     model = deepq.models.cnn_to_mlp(
@@ -154,38 +199,6 @@ def main():
 
 # 2018-08-12-19:21:50 512
 
-#2018-08-12-10:25:50 model 4, 100k, lr 0.0005, alpha 0.6, gamma 0.99, 8 frames v1
-#2018-08-12-11:31:59 model 4, 100k, lr 0.0005, alpha 0.8, gamma 0.99, 6 frames v1
-
-# model 04
-# nature human paper + Improvements
-# Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
-    model = deepq.models.cnn_to_mlp(
-        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
-        hiddens=[512],# 512
-        dueling=bool(1),
-    )
-
-    act = deepq.learn(
-        env,
-        q_func=model,
-        lr= 0.0001,  # 0.00025 1e-4
-        max_timesteps=int(100000), # 100k -> 3h
-        buffer_size=50000,  # 5000, #10000
-        exploration_fraction=0.3,  # 0.1,
-        exploration_final_eps=0.1,  # 0.01
-        train_freq=4,  # 4
-        learning_starts=25000,  # 10000
-        target_network_update_freq=1000,
-        gamma=0.5, #0.99,
-        prioritized_replay=bool(1),
-        prioritized_replay_alpha=0.2,
-        checkpoint_freq=args.checkpoint_freq,
-        #        checkpoint_path=args.checkpoint_path,
-        callback=render_callback,
-        print_freq=1
-    )
-
 
     # 2018-08-08-18:38:35, model4 100k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
     # 2018-08-08-19:29:19, model4 200k, e_f 0.9, e_f_eps 0.1, trainf 4, gamma 0.95, replay 1, lr 0.00025
@@ -226,12 +239,3 @@ def main():
         print_freq=1
     )
 '''
-
-    print("Saving model to mario_model.pkl " + timestart)
-    act.save("../models/mario_model_{}.pkl".format(timestart))
-
-    env.close()
-
-
-if __name__ == '__main__':
-    main()
