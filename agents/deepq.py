@@ -2,18 +2,13 @@ from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, DownsampleEnv, FrameS
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
-
 from agents.wrapper import FrameMemoryWrapper, VideoRecorderWrapper, EpisodicLifeEnv
-
-
-
 from baselines import deepq
 from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import WarpFrame, FrameStack
 from baselines import bench
-import argparse
 from baselines import logger
-
+import argparse
 import datetime
 import time
 import os
@@ -39,52 +34,43 @@ def main():
     logger.set_level(logger.INFO)
     set_global_seeds(args.seed)
 
-    #env = gym_super_mario_bros.make('SuperMarioBros-v1')
     env = gym_super_mario_bros.make('SuperMarioBros-v1')
-    #env = gym_super_mario_bros.make('SuperMarioBrosNoFrameskip-v3')
-
+#wrap environment 
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-
+    
+#record videos of an episode
     env = VideoRecorderWrapper(env, PROJ_DIR+"/../video", str(timestart), 50)
-
+#the agent has only one trial 
     env = EpisodicLifeEnv(env)
 
     # nes_py
+    #preprocess the input frame
     env = DownsampleEnv(env, (84, 84))
+    #set death penalty
     env = PenalizeDeathEnv(env, penalty=-25)
+    #Stack 4 Framse as input
     env = FrameStackEnv(env, 4)
-
-    # gym
-    #env = WarpFrame(env)
-    #env = FrameStack(env, 4)
-
-    # custom
-    #env = ProcessFrame84(env)
-    #env = FrameMemoryWrapper(env)
-
-
+    
+    #print tensorboard log information
     print("logger.get_dir():", logger.get_dir())
     print("PROJ_DIR:", PROJ_DIR)
 
     act = None
-
+    #enable output in the terminal 
     env = bench.Monitor(env, logger.get_dir())
 
-
-    #env = deepq.wrap_atari_dqn(env)
-
     modelname = datetime.datetime.now().isoformat()
-
+    
+    #define callback function for the training process
     def render_callback(lcl, _glb):
         # print(lcl['episode_rewards'])
         total_steps = lcl['env'].total_steps
-
         #if total_steps % 2000 == 0:
 
         env.render()
         # pass
 
-
+#different models with different parameters. out commented
 
     # model 01
     '''
@@ -94,8 +80,6 @@ def main():
         dueling=bool(args.dueling),
     )
     '''
-
-
 
     # model 02
     # like the deep mind paper
@@ -146,41 +130,34 @@ def main():
     )
     '''
 
-    #2:20 model 03 max_timesteps=int(1000000), buffer_size=50000,
-    #2:21 model 03 max_timesteps=int(500000), buffer_size=25000,
-    # 2018-08-07-11:49:49 model 04
-    # 2018-08-07-14:56:07_00800 model 4, 300k timesteps
-    # 2018-08-07-22:10:37 v3, model 4, 200k timesteps
-    # 2018-08-07-22:10:42 v1, model 4, 200k timesteps
+#2:20 model 03 max_timesteps=int(1000000), buffer_size=50000,
+#2:21 model 03 max_timesteps=int(500000), buffer_size=25000,
+# 2018-08-07-11:49:49 model 04
+# 2018-08-07-14:56:07_00800 model 4, 300k timesteps
+# 2018-08-07-22:10:37 v3, model 4, 200k timesteps
+# 2018-08-07-22:10:42 v1, model 4, 200k timesteps
 #2018-08-12-08:38:40 model 4, 50k timesteps, lr 0.5, ef 0.9, gamma 0.95 v1
-
-
-
 #2018-08-12-09:19:56 model 4, 100k, lr 0.0025, alpha 0.8, gamma 0.9, 8 frames v1
 #2018-08-12-12:56:52 model 4, 100k, lr 0.0025, alpha 0.8, gamma 0.9, 4 frames v1
 #2018-08-12-12:58:06 model 4, 100k, lr 0.0001, alpha 0.8, gamma 0.9, 4 frames v1
 #2018-08-12-12:59:49 model 4, 100k, lr 0.0001, alpha 0.5, gamma 0.9, 4 frames v1
 #2018-08-12-13:00:58 model 4, 100k, lr 0.0001, alpha 0.2, gamma 0.9, 4 frames v1
+# last day
+# best
+# 2018-08-12-16:45:48 model 4, 100k, lr 0.0001, alpha 0.2, gamma 0.9, 4 frames v1 hidden 256
 
+# 2018-08-12-17:48:48 gamma=0.2 fraction=0.3, lr= 0.0001, hidden 256
 
-    # last day
-    # best
-    # 2018-08-12-16:45:48 model 4, 100k, lr 0.0001, alpha 0.2, gamma 0.9, 4 frames v1 hidden 256
+# 2018-08-12-18:12:12 gamma=0.5, fraction=0.3, lr= 0.0001, hidden 256
 
-    # 2018-08-12-17:48:48 gamma=0.2 fraction=0.3, lr= 0.0001, hidden 256
+# 2018-08-12-19:21:50 512
 
-    # 2018-08-12-18:12:12 gamma=0.5, fraction=0.3, lr= 0.0001, hidden 256
+#2018-08-12-10:25:50 model 4, 100k, lr 0.0005, alpha 0.6, gamma 0.99, 8 frames v1
+#2018-08-12-11:31:59 model 4, 100k, lr 0.0005, alpha 0.8, gamma 0.99, 6 frames v1
 
-    # 2018-08-12-19:21:50 512
-
-
-    #2018-08-12-10:25:50 model 4, 100k, lr 0.0005, alpha 0.6, gamma 0.99, 8 frames v1
-    #2018-08-12-11:31:59 model 4, 100k, lr 0.0005, alpha 0.8, gamma 0.99, 6 frames v1
-
-    # model 04
-    # nature human paper + Improvements
-    # Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
-
+# model 04
+# nature human paper + Improvements
+# Dueling Double DQN, Prioritized Experience Replay, and fixed Q-targets
     model = deepq.models.cnn_to_mlp(
         convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],  # (num_outputs, kernel_size, stride)
         hiddens=[512],# 512
